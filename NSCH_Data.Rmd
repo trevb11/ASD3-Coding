@@ -1,0 +1,52 @@
+```{r}
+library(data.table)
+library(haven)
+```
+
+```{r}
+
+url.vec <- c("https://www2.census.gov/programs-surveys/nsch/datasets/2016/nsch_2016_topical.zip",
+             "https://www2.census.gov/programs-surveys/nsch/datasets/2017/nsch_2017_topical.zip",
+             "https://www2.census.gov/programs-surveys/nsch/datasets/2018/nsch_2018_topical_SAS.zip",
+             "https://www2.census.gov/programs-surveys/nsch/datasets/2019/nsch_2019_topical_SAS.zip",
+             "https://www2.census.gov/programs-surveys/nsch/datasets/2020/nsch_2020_topical_SAS.zip",
+             "https://www2.census.gov/programs-surveys/nsch/datasets/2021/nsch_2021_topical_SAS.zip",
+             "https://www2.census.gov/programs-surveys/nsch/datasets/2022/nsch_2022_topical_SAS.zip")
+
+for(item in url.vec){
+  file_name = basename(item)
+  if(!file.exists(file_name)) download.file(item, file_name)
+  unzip(file_name)
+}
+```
+```{r}
+file.list <- Sys.glob("*sas7bdat")
+NSCH.data <- list()
+for(file in file.list){
+  NSCH.data[[paste(file)]] <- haven::read_sas(file)
+  print(dim(NSCH.data[[paste(file)]]))
+}
+
+```
+
+
+
+```{r}
+column.names.table.list <- list()
+for(item in 1:length(NSCH.data)){
+    column.names <- colnames(NSCH.data[[item]])
+    column.labels <- as.character(sapply(NSCH.data[[item]], attr, "label")) 
+    column.names.table.list[[item]] <- data.table(column.names, column.labels)
+}
+
+column.names.table <- rbindlist(column.names.table.list)
+column.names.table[, column.names_count := .N, by = column.names]
+column.names.table.filtered <- column.names.table[column.names_count == 7, ,]
+column.names.table.unique <- column.names.table.filtered[!duplicated(column.names), ]
+column.names.table.unique <- column.names.table.unique[, column.names_count := NULL]
+
+fwrite(column.names.table.unique, "column.names.table.unique.csv")
+fwrite(column.names.table.unique, "column.names.table.unique.xlsx")
+```
+
+
