@@ -19,6 +19,7 @@ for(item in url.vec){
   unzip(file_name)
 }
 ```
+
 ```{r}
 file.list <- Sys.glob("*sas7bdat")
 NSCH.data <- list()
