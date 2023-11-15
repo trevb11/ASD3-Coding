@@ -1,0 +1,47 @@
+setwd("~/Users/jared/ASD_CSV_FILES")
+library(data.table)
+library(readxl)
+library(dplyr)
+
+file.list <- list()
+list_of_file_names <- c("2016_17_NSCH_Topical_Implicate_CAHMI_DRCv2.csv", "2018-2019_NSCH_Topical_CAHMI_DRCv2.csv", "2020-2021_NSCH_Topical_CA_HMI_DRCv2.csv")
+for(name in list_of_file_names){
+    file_path <- file.path("./ASD_CSV_FILES", name)
+    file.list[[name]] <-data.table::fread(file_path)
+}
+
+file.16_17 <- file.list[[list_of_file_names[1]]]
+file.18_19 <- file.list[[list_of_file_names[2]]]
+file.20_21 <- file.list[[list_of_file_names[3]]]
+
+#make a data frame of codes and their category **LOOKING AT 8 CODES TO BEGIN WITH***
+**#HOW MANY COLUMNS OF EACH SURVEY ENTRY DO WE WANT????**
+
+COMORBIDITY <- c("K2Q34A", "K2Q36A", "K2Q60A", "K2Q37A", "K2Q30A", "K2Q31A")
+RESIDENCE <- c("LIVEUSA_MO", "K11Q43R")
+
+codes <- c(COMORBIDITY, RESIDENCE)
+
+categories <- rep(c("COMORBIDITY", "RESIDENCE"), c(length(COMORBIDITY), length(RESIDENCE)))
+
+#find survey answers for codes in codes for 16_17 and 18_19
+
+for(file in file.list){
+  for(code in codes){
+  survery.answers.dt <- as.data.table(file$code, nrows = 16, ncols = 1, by = FALSE)
+  
+  } 
+}
+
+#convert to one hot, each survey answer will need a serparte column with 0 or 1
+
+learning.dt <- data.table(
+  Code = codes,
+  Categories = categories,
+  Survey_Answer = survery.answers,
+  Year = year,
+  Fold = 
+)
+
+
+
