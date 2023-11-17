@@ -1,47 +1,77 @@
 setwd("~/Users/jared/ASD_CSV_FILES")
+library(MASS)
 library(data.table)
 library(readxl)
 library(dplyr)
 
 file.list <- list()
-list_of_file_names <- c("2016_17_NSCH_Topical_Implicate_CAHMI_DRCv2.csv", "2018-2019_NSCH_Topical_CAHMI_DRCv2.csv", "2020-2021_NSCH_Topical_CA_HMI_DRCv2.csv")
+list_of_file_names <- c("2016_17_NSCH_Topical_Implicate_CAHMI_DRCv2.csv", "2018-2019_NSCH_Topical_CAHMI_DRCv2.csv")
 for(name in list_of_file_names){
     file_path <- file.path("./ASD_CSV_FILES", name)
     file.list[[name]] <-data.table::fread(file_path)
 }
 
-file.16_17 <- file.list[[list_of_file_names[1]]]
-file.18_19 <- file.list[[list_of_file_names[2]]]
-file.20_21 <- file.list[[list_of_file_names[3]]]
-
-#make a data frame of codes and their category **LOOKING AT 8 CODES TO BEGIN WITH*** **Looking at these 8 from 2 files for a total of 16 rows.**
-**#HOW MANY COLUMNS OF EACH SURVEY ENTRY DO WE WANT????**
-
+#make a data frame of codes and their category
 COMORBIDITY <- c("K2Q34A", "K2Q36A", "K2Q60A", "K2Q37A", "K2Q30A", "K2Q31A")
 RESIDENCE <- c("LIVEUSA_MO", "K11Q43R")
-
 codes <- c(COMORBIDITY, RESIDENCE)
-
 categories <- rep(c("COMORBIDITY", "RESIDENCE"), c(length(COMORBIDITY), length(RESIDENCE)))
 
-#find survey answers for codes in codes for 16_17 and 18_19
+#creating learning.codes table
 
-for(file in file.list){
-  for(code in codes){
-  survery.answers.dt <- as.data.table(file$code, nrows = 16, ncols = 1, by = FALSE)
+learning.codes <- data.table()
+for(file_name in names(file.list)){
+  subset_data <- file.list[[file_name]][, ..codes]
   
-  } 
+  new_data <- data.table(matrix(NA, nrow = nrow(file.list[[file_name]]), ncol = length(codes)))
+                         setnames(new_data, codes)
+                         
+  new_data[, (codes) := subset_data]
+  
+  learning.codes <- rbindlist(list(learning.codes, new_data), fill = TRUE)
+  
 }
 
-#convert to one hot, each survey answer will need a serparte column with 0 or 1
+#one-hot columns
+one_hotted_data <- copy(learning.codes)
+for(col.name in names(one_hotted_data)) {
+  
+  unique_values <- unique(one_hotted_data[[col.names]])
+                          
+  for(value in unique_values) {
+    
+      if(!is.na(value)) {
+        
+      new.col.name <- paste(col.name, value, sep = "_")
+      
+      one_hotted_data[, (new.col.name) := as.integer(one_hotted_data[[col.name]] == value)]
+      }
+  }
+}
 
-learning.dt <- data.table(
-  Code = codes,
-  Categories = categories,
-  Survey_Answer = survery.answers,
-  Year = year,
-  Fold = 
-)
+#add a year column
+learning.codes[, Year := ifelse(.I <= 71811, "2016 - 2017", "2018-2019")]
+
+#Fold assignment function
+
+OneFold <- function(data, k, validation_fold) {
+  n_rows <- nrow(data)
+  rows_per_fold <- ceiling(n_rows / k)
+  
+  set.seed(123)
+  
+  data[, Fold := rep(1:k, n_rows, replace = TRUE)]
+  
+  data[, Set := ifelse(fold == validation_fold, "validation", "train")]
+  
+  return(data)
+}
+
+
+k <- 3
+validation_fold <- 3
+folded_data <- OneFold(learning.codes, k = 3, validation_fold)
+
 
 
 
