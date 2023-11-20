@@ -15,7 +15,15 @@ for(name in list_of_file_names){
 COMORBIDITY <- c("K2Q34A", "K2Q36A", "K2Q60A", "K2Q37A", "K2Q30A", "K2Q31A")
 RESIDENCE <- c("LIVEUSA_MO", "K11Q43R")
 codes <- c(COMORBIDITY, RESIDENCE)
+descriptions <- c("Behavior Problems", "Developmental Delay", "Intellectual Disability",
+                  "Speech Disorder", "Learning Disability", "ADD/ADHD",
+                  "How Long Living in the United States - Years", "How Many Times Moved to New Address")
+
+code_dictionary <- setNames(descriptions, codes)
+
+
 categories <- rep(c("COMORBIDITY", "RESIDENCE"), c(length(COMORBIDITY), length(RESIDENCE)))
+outputs <- c("K2Q35A", "K2Q35B")
 
 #creating learning.codes table
 
@@ -32,11 +40,14 @@ for(file_name in names(file.list)){
   
 }
 
+#add a year column
+learning.codes[, Year := ifelse(.I <= 71811, "2016 - 2017", "2018-2019")]
+
 #one-hot columns
 one_hotted_data <- copy(learning.codes)
 for(col.name in names(one_hotted_data)) {
   
-  unique_values <- unique(one_hotted_data[[col.names]])
+  unique_values <- unique(one_hotted_data[[col.name]])
                           
   for(value in unique_values) {
     
@@ -49,10 +60,9 @@ for(col.name in names(one_hotted_data)) {
   }
 }
 
-#add a year column
-learning.codes[, Year := ifelse(.I <= 71811, "2016 - 2017", "2018-2019")]
+training.data <- one_hotted_data[,10:53]
 
-#Fold assignment function
+#assigning folds
 
 OneFold <- function(data, k, validation_fold) {
   n_rows <- nrow(data)
@@ -60,17 +70,25 @@ OneFold <- function(data, k, validation_fold) {
   
   set.seed(123)
   
-  data[, Fold := rep(1:k, n_rows, replace = TRUE)]
+  data[, Fold := rep(1:k, each = rows_per_fold, replace = TRUE)]
   
-  data[, Set := ifelse(fold == validation_fold, "validation", "train")]
+  data[, Set := ifelse(Fold == validation_fold, "validation", "train")]
   
   return(data)
 }
 
-
+# Example usage
 k <- 3
-validation_fold <- 3
-folded_data <- OneFold(learning.codes, k = 3, validation_fold)
+validation_fold <- 2
+folded_data <- OneFold(training.data, k = k, validation_fold = validation_fold)
+
+
+
+
+glm.list <- list()
+for{fold in 1:k}{
+  fold <- cv.glmnet(folded_data, nfolds = 3)
+  
 
 
 
