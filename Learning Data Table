@@ -7,88 +7,110 @@ library(dplyr)
 file.list <- list()
 list_of_file_names <- c("2016_17_NSCH_Topical_Implicate_CAHMI_DRCv2.csv", "2018-2019_NSCH_Topical_CAHMI_DRCv2.csv")
 for(name in list_of_file_names){
-    file_path <- file.path("./ASD_CSV_FILES", name)
+    file_path <- file.path(getwd(), name)
     file.list[[name]] <-data.table::fread(file_path)
 }
 
 #make a data frame of codes and their category
-COMORBIDITY <- c("K2Q34A", "K2Q36A", "K2Q60A", "K2Q37A", "K2Q30A", "K2Q31A")
+COMORBIDITY <- c("K2Q34A", "K2Q34B", "K2Q36A", "K2Q36B", "K2Q60A", "K2Q60B", "K2Q37A", "K2Q37B",
+                 "K2Q30A", "K2Q30B", "K2Q31A", "K2Q31B")
+
 RESIDENCE <- c("LIVEUSA_MO", "K11Q43R")
-codes <- c(COMORBIDITY, RESIDENCE)
-descriptions <- c("Behavior Problems", "Developmental Delay", "Intellectual Disability",
-                  "Speech Disorder", "Learning Disability", "ADD/ADHD",
-                  "How Long Living in the United States - Years", "How Many Times Moved to New Address")
 
-code_dictionary <- setNames(descriptions, codes)
+DEMOGRAPHIC <- c("SC_RACER", "SC_HISPANIC_R", "HOUSE_GEN", "A1_GRADE", "A2_GRADE", "HHLANGUAGE", "SC_AGE_YEARS", "SC_SEX")
 
-
-categories <- rep(c("COMORBIDITY", "RESIDENCE"), c(length(COMORBIDITY), length(RESIDENCE)))
 outputs <- c("K2Q35A", "K2Q35B")
 
-#creating learning.codes table
+codes <- c(COMORBIDITY, RESIDENCE, DEMOGRAPHIC, outputs)
 
+descriptions <- c("Behavior Problems", "Behavior Problems Currently", "Developmental Delay", "Developmental Delay Currently",
+                    "Intellectual Disability", "Intellectual Disability Currently",
+                  "Speech Disorder", "Speech Disorder Currently", "Learning Disability", "Learning Disability Currently",
+                  "ADD/ADHD", "ADD/ADHD Currently",
+                  "How Long Living in the United States - Years", "How Many Times Moved to New Address", "Race of Selected Child, Recode",
+                  "Hispanic Origin of Selected Child, Recode", "Parental Nativity", "Adult 1 - Highest Completed Year of School", "Adult 2 - Highest Completed Year of School",
+                  "Primary HH Language", "Age of Seleced Child - In Years", "Sex of Selected Child", "Autism ASD", "Autism ASD Currently")
+
+code_dictionary <- setNames(descriptions, codes)
+categories <- rep(c("COMORBIDITY", "RESIDENCE", "DEMOGRAPHIC"), c(length(COMORBIDITY), length(RESIDENCE), length(DEMOGRAPHIC)))
+
+
+#creating learning.codes table
 learning.codes <- data.table()
 for(file_name in names(file.list)){
   subset_data <- file.list[[file_name]][, ..codes]
-  
+
   new_data <- data.table(matrix(NA, nrow = nrow(file.list[[file_name]]), ncol = length(codes)))
                          setnames(new_data, codes)
-                         
-  new_data[, (codes) := subset_data]
-  
-  learning.codes <- rbindlist(list(learning.codes, new_data), fill = TRUE)
-  
-}
 
-#add a year column
-learning.codes[, Year := ifelse(.I <= 71811, "2016 - 2017", "2018-2019")]
+  new_data[, (codes) := subset_data]
+
+  learning.codes <- rbindlist(list(learning.codes, new_data), fill = TRUE)
+
+}
 
 #one-hot columns
 one_hotted_data <- copy(learning.codes)
-for(col.name in names(one_hotted_data)) {
-  
+variable.list <- list()
+
+#subset if don't want to one-hot certain columns
+
+columns.to.encode <- codes[!codes %in% "SC_AGE_YEARS"]
+for(col.name in columns.to.encode) {
+
   unique_values <- unique(one_hotted_data[[col.name]])
-                          
+
   for(value in unique_values) {
-    
-      if(!is.na(value)) {
-        
+
+    if(!is.na(value)) {
+
       new.col.name <- paste(col.name, value, sep = "_")
-      
+
+      variable.list[[new.col.name]] <- new.col.name
+
       one_hotted_data[, (new.col.name) := as.integer(one_hotted_data[[col.name]] == value)]
-      }
+    }
   }
 }
 
-training.data <- one_hotted_data[,10:53]
+#add a year column
+one_hotted_data[, Year := ifelse(.I <= 71811, "2016 - 2017", "2018-2019")]
 
 #assigning folds
 
-OneFold <- function(data, k, validation_fold) {
+OneFold <- function(data, k, test_fold) {
   n_rows <- nrow(data)
-  rows_per_fold <- ceiling(n_rows / k)
-  
+
   set.seed(123)
-  
-  data[, Fold := rep(1:k, each = rows_per_fold, replace = TRUE)]
-  
-  data[, Set := ifelse(Fold == validation_fold, "validation", "train")]
-  
+
+  data[, Fold := sample(rep(1:k, l = .N))]
+
+  data[, Set := ifelse(Fold == test_fold, "test", "train")]
+
   return(data)
+
+}
+# Example usage
+
+n.folds <- 3
+subset.with.autism.cols <- one_hotted_data[,(length(codes)+1):(ncol(one_hotted_data)-1)]
+columns_to_exclude <- c("K2Q35A_2", "K2Q35A_1", "K2Q35A_99", "K2Q35B_95", "K2Q35B_1", "K2Q35B_99", "K2Q35B_2")
+input.columns <- subset.with.autism.cols %>%
+  select(-one_of(columns_to_exclude))
+output.column <- one_hotted_data[["K2Q35A_1"]]
+
+
+glm.model.list <- list()
+for(test_fold in 1:n.folds){
+  folded_data <- OneFold(input.columns, n.folds, test_fold)
+  train.set <- folded_data[i = Set == "train"]
+  train.inputs <- train.set[,input.columns]
+  train.output <- train.set[,output.column]
+  my.model.for.fold.k <- cv.glmnet(as.matrix(train.inputs), train.output)
+  glm.model.list[[test_fold]] <- my.model.for.fold.k
 }
 
-# Example usage
-k <- 3
-validation_fold <- 2
-folded_data <- OneFold(training.data, k = k, validation_fold = validation_fold)
 
-
-
-
-glm.list <- list()
-for{fold in 1:k}{
-  fold <- cv.glmnet(folded_data, nfolds = 3)
-  
 
 
 
