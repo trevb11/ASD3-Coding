@@ -90,27 +90,67 @@ OneFold <- function(data, k, test_fold) {
   return(data)
 
 }
-# Example usage
 
 n.folds <- 3
 subset.with.autism.cols <- one_hotted_data[,(length(codes)+1):(ncol(one_hotted_data)-1)]
-columns_to_exclude <- c("K2Q35A_2", "K2Q35A_1", "K2Q35A_99", "K2Q35B_95", "K2Q35B_1", "K2Q35B_99", "K2Q35B_2")
+columns_to_exclude <- autism.outputs.list
 input.columns <- subset.with.autism.cols %>%
   select(-one_of(columns_to_exclude))
 output.column <- one_hotted_data[["K2Q35A_1"]]
 
+#How do I get a featureless model
+
 
 glm.model.list <- list()
 for(test_fold in 1:n.folds){
-  folded_data <- OneFold(input.columns, n.folds, test_fold)
+  folded_data <- OneFold(one_hotted_data, n.folds, test_fold)
   train.set <- folded_data[i = Set == "train"]
-  train.inputs <- train.set[,input.columns]
-  train.output <- train.set[,output.column]
-  my.model.for.fold.k <- cv.glmnet(as.matrix(train.inputs), train.output)
+  test.set <- folded_data[i = Set == "test"]
+  train.inputs <- train.set[, names(input.columns), with = FALSE]
+  train.output <- train.set[, "K2Q35A_1", with = FALSE]
+  train.double.input <- as.matrix((train.inputs))
+  train.double.output <- as.matrix(train.output)
+  my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output)
   glm.model.list[[test_fold]] <- my.model.for.fold.k
 }
 
+#True Autism Rate
 
+instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
+instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
+featureless.rate <- instances.autism/instances.no.autism
+print(featureless.rate)
+
+#Most Frequent Class
+
+most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
+
+#Predictions
+
+n.algorithms <- 2
+n.predictions <- n.folds * n.algorithms
+glm.predictions.list <- list()
+glm.accuracies.list <- list()
+featureless.predictions.list <- list()
+featureless.accuracies.list <- list()
+
+for(fold in 1:n.fold){
+  glm.prediction <- predict(glm.model.list[[fold]], test.set)
+  glm.predictions.list[[fold]] <- glm.prediction
+  glm.accuracy <- mean(prediction ==test.set$most.frequent.class)
+
+  featureless.predictions.list[[fold]] <- (predict(glm.model.))
+  featureless.accuracy <- mean(featureless.)
+  featureless.accuracies.list[[prediction]] <- featureless_accuracy
+
+}
+
+#Test Accuracy Table
+
+
+test.accuracy <- rbind(glm.accuracies.list, featureless.accuracies.list)
+algorithm <- list("cv.glmnet", "featureless")
+test.accuracy.dt <- DT["Test Accuracy", "Algorithm"]
 
 
 
