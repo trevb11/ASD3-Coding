@@ -126,7 +126,6 @@ print(featureless.rate)
 most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
 
 #Predictions
-
 n.algorithms <- 2
 n.predictions <- n.folds * n.algorithms
 glm.predictions.list <- list()
@@ -134,23 +133,33 @@ glm.accuracies.list <- list()
 featureless.predictions.list <- list()
 featureless.accuracies.list <- list()
 
+
+glm.predictions <- predict(glm.model.list[[fold]], test.set)
+
+
+#first try at code for fitting predictions, structure may need improvement and has errors
+
 for(fold in 1:n.fold){
   glm.prediction <- predict(glm.model.list[[fold]], test.set)
   glm.predictions.list[[fold]] <- glm.prediction
   glm.accuracy <- mean(prediction ==test.set$most.frequent.class)
-
   featureless.predictions.list[[fold]] <- (predict(glm.model.))
   featureless.accuracy <- mean(featureless.)
   featureless.accuracies.list[[prediction]] <- featureless_accuracy
 
 }
 
-#Test Accuracy Table
-
 
 test.accuracy <- rbind(glm.accuracies.list, featureless.accuracies.list)
 algorithm <- list("cv.glmnet", "featureless")
 test.accuracy.dt <- DT["Test Accuracy", "Algorithm"]
+
+ggplot(aes( x = test.accuracy , y = algorithm)) +
+  geom_point
+  labels( xlab = "Test Accuracy", ylab = "Algorithm")
+
+
+
 
 
 
