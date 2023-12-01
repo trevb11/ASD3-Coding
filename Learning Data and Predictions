@@ -150,11 +150,12 @@ featureless.accuracies.list <- list()
 
 #first try at code, structure may need improvement
 
-for(fold in 1:n.fold){
+for(fold in 1:n.folds){
   glm.prediction <- predict(glm.model.list[[fold]], test.double.input)
+  glm.prediction <- ifelse(glm.prediction > 0.3, 1, glm.prediction)
   glm.predictions.list[[fold]] <- glm.prediction
-  featureless.predictions.list[[fold]] <- predict(glm.model.))
 }
+
 
 
 test.accuracy <- rbind(glm.accuracies.list, featureless.accuracies.list)
