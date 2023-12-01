@@ -113,15 +113,15 @@ for(test_fold in 1:n.folds){
   train.set <- folded_data[i = Set == "train"]
   test.set <- folded_data[i = Set == "test"]
   train.inputs <- train.set[, names(input.columns), with = FALSE]
+  test.inputs <- test.set[,names(input.columns), with = FALSE]
   train.output <- train.set[, "K2Q35A_1", with = FALSE]
-  train.double.input <- as.matrix((train.inputs))
+  train.double.input <- as.matrix(train.inputs)
   train.double.output <- as.matrix(train.output)
+  test.double.input <- as.matrix(test.inputs)
   my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output)
   glm.model.list[[test_fold]] <- my.model.for.fold.k
 }
 
-#example test using predict
-prediction.for.first.fold <- predict(glm.model.list[[1]], train.set)
 
 #True Autism Rate
 instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
@@ -136,6 +136,8 @@ most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.colum
 #how do I get a featureless model??
 
 
+prediction.for.first.fold <- predict(glm.model.list[[1]], test.double.input)
+
 
 
 library(glmnet)
@@ -146,19 +148,12 @@ glm.accuracies.list <- list()
 featureless.predictions.list <- list()
 featureless.accuracies.list <- list()
 
-
-glm.prediction <- predict(glm.model.list[[1]], test.set)
-
-
 #first try at code, structure may need improvement
 
 for(fold in 1:n.fold){
-  glm.prediction <- predict(glm.model.list[[fold]], test.set)
+  glm.prediction <- predict(glm.model.list[[fold]], test.double.input)
   glm.predictions.list[[fold]] <- glm.prediction
-  glm.accuracy <- mean(prediction ==test.set$most.frequent.class)
   featureless.predictions.list[[fold]] <- predict(glm.model.))
-  featureless.accuracy <- mean(featureless.)
-  featureless.accuracies.list[[prediction]] <- featureless_accuracy
 }
 
 
@@ -169,7 +164,6 @@ test.accuracy.dt <- DT["Test Accuracy", "Algorithm"]
 ggplot(aes( x = test.accuracy , y = algorithm)) +
   geom_point
   labels( xlab = "Test Accuracy", ylab = "Algorithm")
-
 
 
 
