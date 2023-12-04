@@ -75,12 +75,9 @@ for(col.name in columns.to.encode) {
   }
 }
 
-#add a year column
-
-
-nrow()
-
-one_hotted_data[, Year := ifelse(.I <= 71811, "2016 - 2017", "2018-2019")]
+#add #a year column 
+nrow(fil.list[[1])
+one_hotted_data[, Year := ifelse(.I <= nrow(file.list[[1]], "2016 - 2017", "2018-2019")]
 
 #assigning folds
 
@@ -123,49 +120,6 @@ for(test_fold in 1:n.folds){
 }
 
 
-#True Autism Rate
-instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
-instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
-featureless.rate <- instances.autism/instances.no.autism
-print(featureless.rate)
-
-#Most Frequent Class
-most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
-
-
-#how do I get a featureless model??
-
-
-prediction.for.first.fold <- predict(glm.model.list[[1]], test.double.input)
-
-
-
-library(glmnet)
-n.algorithms <- 2
-n.predictions <- n.folds * n.algorithms
-glm.predictions.list <- list()
-glm.accuracies.list <- list()
-featureless.predictions.list <- list()
-featureless.accuracies.list <- list()
-
-#first try at code, structure may need improvement
-
-for(fold in 1:n.folds){
-  glm.prediction <- predict(glm.model.list[[fold]], test.double.input)
-  glm.prediction <- ifelse(glm.prediction > 0.3, 1, glm.prediction)
-  glm.predictions.list[[fold]] <- glm.prediction
-}
-
-
-
-
-
-#True Autism Rate
-instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
-instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
-featureless.rate <- instances.autism/instances.no.autism
-print(featureless.rate)
-
 
 #predictions
 library(glmnet)
@@ -176,20 +130,18 @@ glm.accuracies.list <- list()
 featureless.predictions.list <- list()
 featureless.accuracies.list <- list()
 
-#first try at code, structure may need improvement
+#Predictions greater than 0.3 rounded up to 1
 
 for(fold in 1:n.folds){
   glm.prediction <- predict(glm.model.list[[fold]], test.double.input)
   glm.prediction <- ifelse(glm.prediction > 0.3, 1, glm.prediction)
+  glm.prediction <- ifelse(glm.prediction < 0.3, 0, glm.prediction)
   glm.predictions.list[[fold]] <- glm.prediction
 
 }
 
 #Featureless Data
 most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
-nrow(train.double.input)
-
-
 featureless.list <- list()
 for(fold in 1:n.folds){
   featureless <- folded_data[i = Fold == fold]
@@ -197,10 +149,30 @@ for(fold in 1:n.folds){
   featureless.list[[fold]] <- output
 }
 
+all.predictions.list <- cbind(glm.predictions.list, featureless.list)
+
+#True Autism Rate
+instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
+instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
+true.rate <- instances.autism/instances.no.autism
+print(true.rate)
+
+#featureless rate = 0.028
 
 
-count_ones <- sum(glm.predictions.list[[1]] == 1)
-test.accuracy <- rbind(glm.accuracies.list, featureless.accuracies.list)
+#code works up until here, error in the following block
+
+test.accuracies.list <- list()
+for (prediction in all.predictions.list){
+  count_ones <- sum(all.predictions.list[[prediction]] == 1)
+  predicted.rate <- count_ones / nrow(all.predictions.list[[prediction]])
+  test.accuracy <- predicted.rate / true.rate
+  test.accuracies.list[[prediction]] <- test.accuracy
+
+}
+
+
+#making a data table for plotting
 
 algorithm <- list("cv.glmnet", "featureless")
 test.accuracy.dt <- DT["Test Accuracy", "Algorithm"]
@@ -208,5 +180,8 @@ test.accuracy.dt <- DT["Test Accuracy", "Algorithm"]
 ggplot(aes( x = test.accuracy , y = algorithm)) +
   geom_point
   labels( xlab = "Test Accuracy", ylab = "Algorithm")
+
+
+
 
 
