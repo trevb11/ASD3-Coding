@@ -75,9 +75,11 @@ for(col.name in columns.to.encode) {
   }
 }
 
-#add #a year column 
-nrow(fil.list[[1])
-one_hotted_data[, Year := ifelse(.I <= nrow(file.list[[1]], "2016 - 2017", "2018-2019")]
+#add a year column
+
+
+
+one_hotted_data[, Year := ifelse(.I <= nrow(file.list[[1]]), "2016 - 2017", "2018-2019")]
 
 #assigning folds
 
@@ -115,7 +117,7 @@ for(test_fold in 1:n.folds){
   train.double.input <- as.matrix(train.inputs)
   train.double.output <- as.matrix(train.output)
   test.double.input <- as.matrix(test.inputs)
-  my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output)
+  my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output, family = "multinomial")
   glm.model.list[[test_fold]] <- my.model.for.fold.k
 }
 
@@ -130,14 +132,11 @@ glm.accuracies.list <- list()
 featureless.predictions.list <- list()
 featureless.accuracies.list <- list()
 
-#Predictions greater than 0.3 rounded up to 1
+#Predictions with cv.glmnet model type = "response"
 
 for(fold in 1:n.folds){
-  glm.prediction <- predict(glm.model.list[[fold]], test.double.input)
-  glm.prediction <- ifelse(glm.prediction > 0.3, 1, glm.prediction)
-  glm.prediction <- ifelse(glm.prediction < 0.3, 0, glm.prediction)
+  glm.prediction <- predict(glm.model.list[[fold]], test.double.input, type = "response")
   glm.predictions.list[[fold]] <- glm.prediction
-
 }
 
 #Featureless Data
@@ -151,35 +150,33 @@ for(fold in 1:n.folds){
 
 all.predictions.list <- cbind(glm.predictions.list, featureless.list)
 
-#True Autism Rate
+#True Autism Rate For Reference
 instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
 instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
 true.rate <- instances.autism/instances.no.autism
 print(true.rate)
 
-#featureless rate = 0.028
-
-
-#code works up until here, error in the following block
+#true rate = 0.028
 
 test.accuracies.list <- list()
 for (prediction in all.predictions.list){
-  count_ones <- sum(all.predictions.list[[prediction]] == 1)
-  predicted.rate <- count_ones / nrow(all.predictions.list[[prediction]])
-  test.accuracy <- predicted.rate / true.rate
+  test.accuracy <- mean(prediction == labels)
   test.accuracies.list[[prediction]] <- test.accuracy
-
 }
-
 
 #making a data table for plotting
 
-algorithm <- list("cv.glmnet", "featureless")
-test.accuracy.dt <- DT["Test Accuracy", "Algorithm"]
+algorithm <- list("cv.glmnet", "Major_class")
+accuracy.dt <- DT["Test Accuracy", "Algorithm"]
 
-ggplot(aes( x = test.accuracy , y = algorithm)) +
-  geom_point
-  labels( xlab = "Test Accuracy", ylab = "Algorithm")
+library(ggplot2)
+ggplot()+
+  geom_point(aes(
+    accuracy.percent, algorithm),
+    shape=1,
+    data=accuracy.dt)+
+  facet_grid(. ~ data.name, labeller=label_both, scales="free")
+
 
 
 
