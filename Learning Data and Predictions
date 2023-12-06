@@ -113,14 +113,15 @@ for(test_fold in 1:n.folds){
   test.set <- folded_data[i = Set == "test"]
   train.inputs <- train.set[, names(input.columns), with = FALSE]
   test.inputs <- test.set[,names(input.columns), with = FALSE]
+  test.output <- test.set[, "K2Q35A_1", with = FALSE]
   train.output <- train.set[, "K2Q35A_1", with = FALSE]
   train.double.input <- as.matrix(train.inputs)
   train.double.output <- as.matrix(train.output)
   test.double.input <- as.matrix(test.inputs)
+  test.double.output <- as.matrix(test.o)
   my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output, family = "multinomial")
   glm.model.list[[test_fold]] <- my.model.for.fold.k
 }
-
 
 
 #predictions
@@ -128,14 +129,8 @@ library(glmnet)
 n.algorithms <- 2
 n.predictions <- n.folds * n.algorithms
 glm.predictions.list <- list()
-glm.accuracies.list <- list()
-featureless.predictions.list <- list()
-featureless.accuracies.list <- list()
-
-#Predictions with cv.glmnet model type = "response"
-
 for(fold in 1:n.folds){
-  glm.prediction <- predict(glm.model.list[[fold]], test.double.input, type = "response")
+  glm.prediction <- predict(glm.model.list[[fold]], test.double.input, type = "class")
   glm.predictions.list[[fold]] <- glm.prediction
 }
 
@@ -143,32 +138,27 @@ for(fold in 1:n.folds){
 most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
 featureless.list <- list()
 for(fold in 1:n.folds){
-  featureless <- folded_data[i = Fold == fold]
-  output <- featureless[["K2Q35A_1"]]
-  featureless.list[[fold]] <- output
+  featureless <- rep(most.frequent.class, test.set$Fold == fold)
+  featureless.list[[fold]] <- featureless
 }
 
-all.predictions.list <- cbind(glm.predictions.list, featureless.list)
+pred.list <- list(glm.predictions.list, featureless.list)
 
-#True Autism Rate For Reference
-instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
-instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
-true.rate <- instances.autism/instances.no.autism
-print(true.rate)
-
-#true rate = 0.028
-
-test.accuracies.list <- list()
-for (prediction in all.predictions.list){
-  test.accuracy <- mean(prediction == labels)
-  test.accuracies.list[[prediction]] <- test.accuracy
+#compute test accuracies
+algorithms.list <- c("cv.glmnet", "featureless")
+accuracy.dt.list <- list()
+for(fold in 1:n.folds){
+  for(algorithm in algorithms.list){
+    pred.vec <- pred.list[[algorithm]]
+    is.correct <- pred.vec == test.double.output
+    accuracy.percent <- 100*mean(is.correct)
+    accuracy.dt.list[[paste(fold, algorithm
+    )]] <- data.table(fold, algorithm, accuracy.percent)
+  }
 }
 
-#making a data table for plotting
-
-algorithm <- list("cv.glmnet", "Major_class")
-accuracy.dt <- DT["Test Accuracy", "Algorithm"]
-
+accuracy.dt <- data.table::rbindlist(accuracy.dt.list)
+data.name <- zip
 library(ggplot2)
 ggplot()+
   geom_point(aes(
@@ -177,6 +167,12 @@ ggplot()+
     data=accuracy.dt)+
   facet_grid(. ~ data.name, labeller=label_both, scales="free")
 
+
+#True Autism Rate For Reference
+instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
+instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
+true.rate <- instances.autism/instances.no.autism
+print(true.rate)
 
 
 
