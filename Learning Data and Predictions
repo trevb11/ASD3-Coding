@@ -106,7 +106,12 @@ input.columns <- one_hotted_data[, !c(codes, autism.outputs.list, "Year", "Fold"
 output.column <- one_hotted_data[["K2Q35A_1"]]
 
 #How do I get a featureless model
+most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
+featureless.list <- list()
 glm.model.list <- list()
+
+accuracy.dt.list <- list()
+
 for(test_fold in 1:n.folds){
   folded_data <- OneFold(one_hotted_data, n.folds, test_fold)
   train.set <- folded_data[i = Set == "train"]
@@ -118,9 +123,30 @@ for(test_fold in 1:n.folds){
   train.double.input <- as.matrix(train.inputs)
   train.double.output <- as.matrix(train.output)
   test.double.input <- as.matrix(test.inputs)
-  test.double.output <- as.matrix(test.o)
+  test.double.output <- as.matrix(test.output)
   my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output, family = "multinomial")
-  glm.model.list[[test_fold]] <- my.model.for.fold.k
+
+  glm.prediction <- predict(my.model.for.fold.k, test.double.input, type = "class")
+  glm.predictions.list[[test_fold]] <- glm.prediction
+  pred.list <- list()
+  pred.list[["cv.glmnet"]] <- glm.prediction
+
+  featureless.fold <- rep(most.frequent.class, nrow(test.double.output))
+  #featureless.list[[test_fold]] <- featureless.fold
+  pred.list[["featureless"]] <- featureless.fold
+
+
+  #compute test accuracies
+  algorithms.list <- c("cv.glmnet", "featureless")
+    for(algorithm in algorithms.list){
+      pred.vec <- pred.list[[algorithm]]
+      is.correct <- pred.vec == test.double.output
+      accuracy.percent <- 100*mean(is.correct)
+
+      accuracy.dt.list[[paste(test_fold, algorithm
+      )]] <- data.table(test_fold, algorithm, accuracy.percent)
+  }
+
 }
 
 
@@ -134,15 +160,7 @@ for(fold in 1:n.folds){
   glm.predictions.list[[fold]] <- glm.prediction
 }
 
-#Featureless Data
-most.frequent.class <- train.output[, .(count=.N), by = main.autism.output.column.name][order(-count)][[main.autism.output.column.name]][1]
-featureless.list <- list()
-for(fold in 1:n.folds){
-  featureless <- rep(most.frequent.class, test.set$Fold == fold)
-  featureless.list[[fold]] <- featureless
-}
-
-pred.list <- list(glm.predictions.list, featureless.list)
+pred.list <- c(glm.predictions.list, featureless.list)
 
 #compute test accuracies
 algorithms.list <- c("cv.glmnet", "featureless")
@@ -157,22 +175,17 @@ for(fold in 1:n.folds){
   }
 }
 
+
 accuracy.dt <- data.table::rbindlist(accuracy.dt.list)
-data.name <- zip
+#data.name <- zip
 library(ggplot2)
 ggplot()+
   geom_point(aes(
     accuracy.percent, algorithm),
     shape=1,
-    data=accuracy.dt)+
-  facet_grid(. ~ data.name, labeller=label_both, scales="free")
+    data=accuracy.dt)
 
 
-#True Autism Rate For Reference
-instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
-instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
-true.rate <- instances.autism/instances.no.autism
-print(true.rate)
 
 
 
