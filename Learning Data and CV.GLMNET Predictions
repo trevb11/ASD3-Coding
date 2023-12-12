@@ -5,7 +5,7 @@ library(data.table)
 library(readxl)
 library(dplyr)
 
-
+#read topical CAHMI .csv files
 file.list <- list()
 list_of_file_names <- c("2016_17_NSCH_Topical_Implicate_CAHMI_DRCv2.csv", "2018-2019_NSCH_Topical_CAHMI_DRCv2.csv")
 for(name in list_of_file_names){
@@ -56,7 +56,6 @@ one_hotted_data <- copy(learning.codes)
 variable.list <- list()
 
 #subset if don't want to one-hot certain columns
-
 columns.to.encode <- codes[!codes %in% "SC_AGE_YEARS"]
 for(col.name in columns.to.encode) {
 
@@ -76,9 +75,6 @@ for(col.name in columns.to.encode) {
 }
 
 #add a year column
-
-
-
 one_hotted_data[, Year := ifelse(.I <= nrow(file.list[[1]]), "2016 - 2017", "2018-2019")]
 
 #assigning folds
@@ -126,17 +122,15 @@ for(test_fold in 1:n.folds){
   test.double.output <- as.matrix(test.output)
   my.model.for.fold.k <- cv.glmnet(train.double.input, train.double.output, family = "multinomial")
 
+  #compute predictions
   glm.prediction <- predict(my.model.for.fold.k, test.double.input, type = "class")
   glm.predictions.list[[test_fold]] <- glm.prediction
   pred.list <- list()
   pred.list[["cv.glmnet"]] <- glm.prediction
-
   featureless.fold <- rep(most.frequent.class, nrow(test.double.output))
-  #featureless.list[[test_fold]] <- featureless.fold
   pred.list[["featureless"]] <- featureless.fold
 
-
-  #compute test accuracies
+  #compute test accuracies within loop
   algorithms.list <- c("cv.glmnet", "featureless")
     for(algorithm in algorithms.list){
       pred.vec <- pred.list[[algorithm]]
@@ -146,37 +140,10 @@ for(test_fold in 1:n.folds){
       accuracy.dt.list[[paste(test_fold, algorithm
       )]] <- data.table(test_fold, algorithm, accuracy.percent)
   }
-
 }
-
-
-#predictions
-library(glmnet)
-n.algorithms <- 2
-n.predictions <- n.folds * n.algorithms
-glm.predictions.list <- list()
-for(fold in 1:n.folds){
-  glm.prediction <- predict(glm.model.list[[fold]], test.double.input, type = "class")
-  glm.predictions.list[[fold]] <- glm.prediction
-}
-
-pred.list <- c(glm.predictions.list, featureless.list)
-
-#compute test accuracies
-algorithms.list <- c("cv.glmnet", "featureless")
-accuracy.dt.list <- list()
-for(fold in 1:n.folds){
-  for(algorithm in algorithms.list){
-    pred.vec <- pred.list[[algorithm]]
-    is.correct <- pred.vec == test.double.output
-    accuracy.percent <- 100*mean(is.correct)
-    accuracy.dt.list[[paste(fold, algorithm
-    )]] <- data.table(fold, algorithm, accuracy.percent)
-  }
-}
-
 
 accuracy.dt <- data.table::rbindlist(accuracy.dt.list)
+
 #data.name <- zip
 library(ggplot2)
 ggplot()+
@@ -186,7 +153,11 @@ ggplot()+
     data=accuracy.dt)
 
 
-
+#True Autism Rate For Reference
+instances.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[2]]
+instances.no.autism <- train.output[, .(count=.N), by = main.autism.output.column.name]$count[[1]]
+true.rate <- instances.autism/instances.no.autism
+print(true.rate)
 
 
 
